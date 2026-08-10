@@ -1,0 +1,34 @@
+# macOS / Xcode
+.DS_Store
+DerivedData/
+.derived-data/
+*.xcuserstate
+xcuserdata/
+*.ipa
+*.dSYM.zip
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+
+# IDE
+.idea/
+.vscode/
+
+# Local data
+data/
+*.sqlite3
+.derivedData/

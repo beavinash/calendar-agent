@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+      - run: uv sync --extra dev --extra test
+        working-directory: backend
+      - run: uv run ruff check app tests
+        working-directory: backend
+      - run: uv run ruff format --check app tests
+        working-directory: backend
+      - run: uv run mypy app tests
+        working-directory: backend
+      - run: uv run pytest
+        working-directory: backend
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make docker-smoke
+
+  ios:
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve available iPhone simulator
+        id: simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          show_destinations() {
+            xcodebuild \
+              -project ios/CalendarAgent/CalendarAgent.xcodeproj \
+              -scheme CalendarAgent \
+              -showdestinations
+          }
+
+          select_simulator() {
+            show_destinations |
+              python3 .github/select_ios_simulator.py
+          }
+
+          warm_core_simulator() {
+            local attempt
+            for attempt in 1 2 3; do
+              if xcrun simctl list devices available >/dev/null; then
+                return 0
+              fi
+              echo "CoreSimulator initialization attempt ${attempt} failed."
+              sleep 2
+            done
+            return 1
+          }
+
+          warm_core_simulator || true
+          if ! simulator_id="$(select_simulator)"; then
+            echo "No compatible iPhone is ready; installing the iOS runtime."
+            xcodebuild -downloadPlatform iOS
+            warm_core_simulator
+            if ! simulator_id="$(select_simulator)"; then
+              xcrun simctl list runtimes || true
+              xcrun simctl list devices available || true
+              echo "::error::No Xcode-compatible iPhone simulator is available."
+              exit 1
+            fi
+          fi
+
+          echo "Using iPhone simulator ${simulator_id}."
+          echo "id=${simulator_id}" >>"${GITHUB_OUTPUT}"
+      - name: Run iOS tests
+        run: >-
+          xcodebuild
+          -project ios/CalendarAgent/CalendarAgent.xcodeproj
+          -scheme CalendarAgent
+          -destination
+          'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}'
+          CODE_SIGNING_ALLOWED=NO
+          test
+      - name: Build unsigned iPhone Release
+        run: >-
+          xcodebuild
+          -project ios/CalendarAgent/CalendarAgent.xcodeproj
+          -scheme CalendarAgent
+          -configuration Release
+          -destination 'generic/platform=iOS'
+          CODE_SIGNING_ALLOWED=NO
+          build

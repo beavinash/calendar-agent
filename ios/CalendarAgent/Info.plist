@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_BASE_URL</key>
+	<string>$(API_BASE_URL)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Mark-1</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Mark-1 reads your existing Apple Calendar events for day, week, and month analysis against your selected calendar categories. Optional scheduling requires separate authorization.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Mark-1 writes only suggested planning blocks you explicitly authorize.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Mark-1 reads your existing Apple Calendar events to analyze scheduled commitments and calendar-category gaps.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>
