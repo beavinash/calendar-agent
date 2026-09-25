@@ -122,4 +122,29 @@ final class CoachSessionControllerTests: XCTestCase {
     XCTAssertFalse(controller.recordActiveTransition())
     XCTAssertEqual(controller.activeSessionId, rotatedSession)
   }
+
+  func testFreshSessionRotatesImmediatelyAndClearsBackgroundTransition() {
+    let suite = "CoachSessionControllerTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var now = Date(timeIntervalSince1970: 1_750_000_000)
+    let controller = CoachSessionController(
+      defaults: defaults,
+      now: { now }
+    )
+    let originalSession = controller.activeSessionId
+    controller.recordBackgroundTransition()
+
+    controller.startFreshSession()
+
+    let freshSession = controller.activeSessionId
+    XCTAssertNotEqual(freshSession, originalSession)
+    now = now.addingTimeInterval(600)
+    XCTAssertFalse(controller.recordActiveTransition())
+    XCTAssertEqual(controller.activeSessionId, freshSession)
+    XCTAssertEqual(
+      CoachSessionController(defaults: defaults).activeSessionId,
+      freshSession
+    )
+  }
 }

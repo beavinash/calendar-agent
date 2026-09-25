@@ -40,6 +40,12 @@ final class CoachSessionController: ObservableObject {
     AppLogger.coach.debug("Recorded coach background transition")
   }
 
+  func startFreshSession() {
+    defaults.removeObject(forKey: Key.backgroundedAt)
+    AppLogger.coach.info("Starting an explicit fresh coach session")
+    rotateSession()
+  }
+
   @discardableResult
   func recordActiveTransition() -> Bool {
     guard let backgroundedAt = defaults.object(
