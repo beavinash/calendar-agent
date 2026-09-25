@@ -118,6 +118,70 @@ final class MissedEventInsightTests: XCTestCase {
     XCTAssertEqual(result.explicitIncompleteCount, 0)
   }
 
+  func testHistoryClearImmediatelyDropsCachedInsightForEveryScope() {
+    let staleEvent = event(
+      "stale",
+      title: "Stale missed event",
+      hoursFromNow: -2 ... -1
+    )
+
+    for scope in ClearHistoryScope.allCases {
+      var cache = CoachMissedInsightCache(
+        events: [staleEvent],
+        loadState: .loaded
+      )
+
+      cache.prepareForHistoryClear(
+        scope,
+        at: now,
+        calendar: calendar
+      )
+
+      XCTAssertTrue(cache.events.isEmpty, "Failed scope: \(scope.rawValue)")
+      XCTAssertEqual(cache.loadState, .loading)
+      XCTAssertEqual(
+        cache.effectiveClearedIntervals([]),
+        scope.analysisInterval(at: now, calendar: calendar).map { [$0] } ?? []
+      )
+    }
+  }
+
+  func testPreviousWeekAndMonthIntervalsCannotRebuildClearedInsight()
+    throws {
+    let reference = try XCTUnwrap(
+      ISO8601DateFormatter().date(from: "2026-07-23T12:00:00Z")
+    )
+
+    for (scope, period) in [
+      (ClearHistoryScope.week, FocusReviewPeriod.week),
+      (ClearHistoryScope.month, FocusReviewPeriod.month)
+    ] {
+      let interval = try XCTUnwrap(
+        scope.analysisInterval(at: reference, calendar: calendar)
+      )
+      let occurrence = interval.start.addingTimeInterval(3_600)
+      let clearedEvent = CalendarDisplayEvent(
+        completionKey: "cleared-\(scope.rawValue)",
+        title: "Cleared \(scope.rawValue)",
+        startAt: occurrence,
+        endAt: occurrence.addingTimeInterval(3_600),
+        isAllDay: false,
+        calendarTitle: "Personal"
+      )
+
+      let result = build(
+        [clearedEvent],
+        period: period,
+        now: reference,
+        trackingStartedAt: reference.addingTimeInterval(-120 * 86_400),
+        clearedIntervals: [interval]
+      )
+
+      XCTAssertTrue(result.groups.isEmpty, "Failed scope: \(scope.rawValue)")
+      XCTAssertEqual(result.missedEventCount, 0)
+    }
+  }
+
   func testGroupsOnlyConservativeNormalizedTitleFamilies() {
     let events = [
       event("one", title: "Project planning", hoursFromNow: -8 ... -7),

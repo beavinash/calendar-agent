@@ -26,13 +26,6 @@ enum FocusReviewCompletionDisclosure {
   }
 }
 
-private enum MissedEventInsightLoadState {
-  case loading
-  case available
-  case calendarUnavailable
-  case failed
-}
-
 private struct MissedEventInsightPresentation: Identifiable {
   let id = UUID()
   let insight: MissedEventInsight
@@ -53,9 +46,7 @@ struct CoachView: View {
   @State private var input = ""
   @State private var selectedReviewPeriod: FocusReviewPeriod = .day
   @State private var isFollowingGeneratedContent = false
-  @State private var missedInsightEvents: [CalendarDisplayEvent] = []
-  @State private var missedInsightLoadState: MissedEventInsightLoadState =
-    .loading
+  @State private var missedInsightCache = CoachMissedInsightCache()
   @State private var presentedMissedInsight: MissedEventInsightPresentation?
   @State private var clearConfirmation = ClearHistoryConfirmationState()
   @State private var clearHistoryFeedback: ClearHistoryFeedback?
@@ -438,7 +429,7 @@ struct CoachView: View {
   @ViewBuilder
   private func missedEventInsightCard(at now: Date) -> some View {
     SurfaceCard {
-      switch missedInsightLoadState {
+      switch missedInsightCache.loadState {
       case .loading:
         Text("Reading the latest Apple Calendar events…")
           .font(.subheadline)
@@ -454,7 +445,7 @@ struct CoachView: View {
           .font(.subheadline)
           .foregroundStyle(.secondary)
           .lineLimit(1)
-      case .available:
+      case .loaded:
         let insight = buildMissedEventInsight(at: now)
         if let emptyMessage = insight.emptyMessage {
           Text(emptyMessage)
@@ -567,20 +558,21 @@ struct CoachView: View {
     at now: Date
   ) -> MissedEventInsight {
     MissedEventInsightBuilder.build(
-      events: missedInsightEvents,
+      events: missedInsightCache.events,
       completionStatuses: completionStatusByKey,
       period: selectedReviewPeriod,
       now: now,
       trackingStartedAt: settings.trackingStartedAt,
       calendar: .current,
-      clearedIntervals: clearedAnalysisIntervals.map(\.interval)
+      clearedIntervals: missedInsightCache.effectiveClearedIntervals(
+        clearedAnalysisIntervals.map(\.interval)
+      )
     )
   }
 
   private func refreshMissedEventInsight() {
     guard calendarService.accessState.canRead else {
-      missedInsightEvents = []
-      missedInsightLoadState = .calendarUnavailable
+      missedInsightCache.markCalendarUnavailable()
       AppLogger.calendar.debug(
         "Coach missed-event insight refresh skipped; calendar_read=false"
       )
@@ -595,22 +587,21 @@ struct CoachView: View {
       calendar: calendar
     )
 
-    missedInsightLoadState = .loading
+    missedInsightCache.beginRefresh()
     AppLogger.calendar.debug(
       "Coach missed-event insight refresh started; period=\(selectedReviewPeriod.rawValue, privacy: .public)"
     )
     do {
-      missedInsightEvents = try calendarService.events(
+      let events = try calendarService.events(
         from: fetchBounds.start,
         to: fetchBounds.end
       )
-      missedInsightLoadState = .available
+      missedInsightCache.finishRefresh(with: events)
       AppLogger.calendar.info(
-        "Coach missed-event insight refresh succeeded; period=\(selectedReviewPeriod.rawValue, privacy: .public) visible_count=\(missedInsightEvents.count, privacy: .public)"
+        "Coach missed-event insight refresh succeeded; period=\(selectedReviewPeriod.rawValue, privacy: .public) visible_count=\(events.count, privacy: .public)"
       )
     } catch {
-      missedInsightEvents = []
-      missedInsightLoadState = .failed
+      missedInsightCache.markRefreshFailed()
       let nsError = error as NSError
       AppLogger.calendar.error(
         "Coach missed-event insight refresh failed; period=\(selectedReviewPeriod.rawValue, privacy: .public) domain=\(nsError.domain, privacy: .private) code=\(nsError.code, privacy: .public)"
@@ -710,7 +701,9 @@ struct CoachView: View {
         history: visibleMessages,
         notes: [],
         completions: completions,
-        clearedIntervals: clearedAnalysisIntervals.map(\.interval),
+        clearedIntervals: missedInsightCache.effectiveClearedIntervals(
+          clearedAnalysisIntervals.map(\.interval)
+        ),
         sessionId: coachSession.activeSessionId,
         modelContext: modelContext,
         settings: settings,
@@ -742,6 +735,11 @@ struct CoachView: View {
       viewModel.resetAfterHistoryClear()
       presentedMissedInsight = nil
       isFollowingGeneratedContent = false
+      missedInsightCache.prepareForHistoryClear(
+        scope,
+        at: timestamp,
+        calendar: calendar
+      )
       coachSession.startFreshSession()
       refreshMissedEventInsight()
       clearHistoryFeedback = .success(scope)

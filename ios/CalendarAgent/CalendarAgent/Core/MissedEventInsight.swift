@@ -1,5 +1,83 @@
 import Foundation
 
+enum CoachMissedInsightLoadState: Equatable {
+  case loading
+  case loaded
+  case calendarUnavailable
+  case failed
+}
+
+struct CoachMissedInsightCache: Equatable {
+  private(set) var events: [CalendarDisplayEvent]
+  private(set) var loadState: CoachMissedInsightLoadState
+  private(set) var pendingClearedIntervals: [DateInterval]
+
+  init(
+    events: [CalendarDisplayEvent] = [],
+    loadState: CoachMissedInsightLoadState = .loading,
+    pendingClearedIntervals: [DateInterval] = []
+  ) {
+    self.events = events
+    self.loadState = loadState
+    self.pendingClearedIntervals = pendingClearedIntervals
+  }
+
+  mutating func prepareForHistoryClear(
+    _ scope: ClearHistoryScope,
+    at timestamp: Date = Date(),
+    calendar: Calendar = .current
+  ) {
+    events = []
+    loadState = .loading
+
+    guard let interval = scope.analysisInterval(
+      at: timestamp,
+      calendar: calendar
+    ) else {
+      pendingClearedIntervals = []
+      return
+    }
+    Self.appendIfMissing(interval, to: &pendingClearedIntervals)
+  }
+
+  func effectiveClearedIntervals(
+    _ persistedIntervals: [DateInterval]
+  ) -> [DateInterval] {
+    var result = persistedIntervals
+    for interval in pendingClearedIntervals {
+      Self.appendIfMissing(interval, to: &result)
+    }
+    return result
+  }
+
+  mutating func beginRefresh() {
+    loadState = .loading
+  }
+
+  mutating func finishRefresh(with events: [CalendarDisplayEvent]) {
+    self.events = events
+    loadState = .loaded
+  }
+
+  mutating func markCalendarUnavailable() {
+    events = []
+    loadState = .calendarUnavailable
+  }
+
+  mutating func markRefreshFailed() {
+    events = []
+    loadState = .failed
+  }
+
+  private static func appendIfMissing(
+    _ interval: DateInterval,
+    to intervals: inout [DateInterval]
+  ) {
+    guard !intervals.contains(interval) else { return }
+    intervals.append(interval)
+  }
+}
+
 enum MissedEventTrackingCoverage: String, Codable, Hashable {
   case full
   case partial

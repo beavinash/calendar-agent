@@ -65,7 +65,11 @@ deleting or editing anything in Apple Calendar.
   missed-pattern evidence and AI review snapshots. Old titles or schedules must
   not influence post-reset model recommendations.
 - Successful reset starts a new coach session, removes in-memory review/proposal/
-  warning state, refreshes missed-event insight, and announces completion.
+  warning state, immediately discards the cached "Likely missed during the past 7
+  days", previous-week, and previous-month insight presentation, refreshes only
+  still-eligible missed-event evidence, and announces completion. `/clear week`
+  must leave the previous completed week empty; `/clear month` must leave the
+  previous completed month empty; `/clear` must exclude all pre-reset occurrences.
 - The reset service must never call EventKit mutation APIs or a hosted backend.
 - Logs may contain counts and result categories only; they must not contain chat,
   note, event-title, credential, or calendar content.
@@ -85,6 +89,7 @@ deleting or editing anything in Apple Calendar.
 | AC-006 | Cleared intervals produce no deterministic missed evidence or outbound AI review context while uncleared events remain eligible. | Deterministic insight tests plus captured outbound request assertions. |
 | AC-007 | Confirmation, success, and error states are accessible and clearly say Apple Calendar was not changed. | Copy assertions, accessibility identifiers, and manual simulator inspection. |
 | AC-008 | Public documentation describes the local deletion boundary and preserved data. | Marker search and documentation review. |
+| AC-009 | After a confirmed clear, the Coach screen cannot display stale pre-clear rows while refreshed evidence is loading; `/clear` excludes all earlier occurrences, `/clear week` leaves the previous completed week analysis empty, and `/clear month` leaves the previous completed month analysis empty. | State-policy regression tests for all three scopes plus focused Coach reset tests. |
 
 Validation commands:
 
@@ -120,6 +125,7 @@ Review scope: iOS local state, related tests, README, and safety documentation
 - [x] T010 | P1 | depends: T007, T008, T009 | AC-007 | Refresh reset-dependent coach presentation; verified by focused tests clearing in-memory drafts, review output, warnings, and errors while rotating the session and rebuilding deterministic insight.
 - [x] T011 | P1 | depends: T009 | AC-007 | Surface accessible reset feedback; verified by scope-specific deterministic copy, system-alert announcement, local-only routing, and six focused presentation/state tests without a chat-record path.
 - [x] T012 | P1 | depends: T010, T011 | AC-008 | Document local deletion boundaries; verified by README coverage of every command, exact periods, deleted/preserved data, Apple Calendar non-mutation, cancellation, and provider-retention limits.
+- [x] T013 | P0 | depends: T010 | Clear cached missed-event presentation before post-reset refresh; verified by cache-state regressions for every reset scope, exact week/month exclusion tests, the 26-test insight suite, and the 166-test iOS suite.
 
 ## 6. Open questions
 
