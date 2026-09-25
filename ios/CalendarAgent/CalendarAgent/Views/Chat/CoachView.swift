@@ -57,7 +57,7 @@ struct CoachView: View {
   @State private var missedInsightLoadState: MissedEventInsightLoadState =
     .loading
   @State private var presentedMissedInsight: MissedEventInsightPresentation?
-  @State private var pendingClearScope: ClearHistoryScope?
+  @State private var clearConfirmation = ClearHistoryConfirmationState()
   @State private var clearHistoryFeedback: ClearHistoryFeedback?
   @FocusState private var inputFocused: Bool
 
@@ -283,39 +283,55 @@ struct CoachView: View {
       MissedEventInsightDetailsView(insight: presentation.insight)
     }
     .confirmationDialog(
-      pendingClearScope.map(
+      clearConfirmation.pendingScope.map(
         ClearHistoryPresentation.confirmationTitle(for:)
       ) ?? "Clear local coaching history?",
       isPresented: Binding(
-        get: { pendingClearScope != nil },
+        get: { clearConfirmation.isPresented },
         set: { isPresented in
           if !isPresented {
-            pendingClearScope = nil
+            clearConfirmation.cancel()
           }
         }
       ),
       titleVisibility: .visible
     ) {
-      if let scope = pendingClearScope {
+      if let scope = clearConfirmation.pendingScope {
         Button(
           ClearHistoryPresentation.confirmationButtonTitle(for: scope),
           role: .destructive
         ) {
-          confirmClear(scope)
+          confirmPendingClear()
         }
+        .accessibilityIdentifier("coach-clear-confirm-button")
       }
       Button("Cancel", role: .cancel) {
-        pendingClearScope = nil
+        clearConfirmation.cancel()
       }
+      .accessibilityIdentifier("coach-clear-cancel-button")
     } message: {
-      Text(ClearHistoryPresentation.confirmationMessage)
+      if let scope = clearConfirmation.pendingScope {
+        Text(ClearHistoryPresentation.confirmationMessage(for: scope))
+      }
     }
-    .alert(item: $clearHistoryFeedback) { feedback in
-      Alert(
-        title: Text(feedback.title),
-        message: Text(feedback.message),
-        dismissButton: .default(Text("OK"))
-      )
+    .alert(
+      clearHistoryFeedback?.title ?? AppBrand.name,
+      isPresented: Binding(
+        get: { clearHistoryFeedback != nil },
+        set: { isPresented in
+          if !isPresented {
+            clearHistoryFeedback = nil
+          }
+        }
+      ),
+      presenting: clearHistoryFeedback
+    ) { _ in
+      Button("OK") {
+        clearHistoryFeedback = nil
+      }
+      .accessibilityIdentifier("coach-clear-feedback-ok")
+    } message: { feedback in
+      Text(feedback.message)
     }
     .alert(item: $viewModel.presentedError) { error in
       Alert(
@@ -662,20 +678,25 @@ struct CoachView: View {
   private func send() {
     let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !value.isEmpty else { return }
-    switch CoachSubmissionRouter.route(value) {
-    case let .confirmLocalClear(scope):
-      input = ""
-      inputFocused = false
-      pendingClearScope = scope
-      return
-    case .invalidLocalCommand:
-      input = ""
-      inputFocused = false
-      clearHistoryFeedback = .invalidCommand
-      return
-    case .providerMessage:
-      break
-    }
+    CoachSubmissionHandler.handle(
+      value,
+      requestLocalClear: { scope in
+        input = ""
+        inputFocused = false
+        clearConfirmation.request(scope)
+      },
+      rejectInvalidCommand: {
+        input = ""
+        inputFocused = false
+        clearHistoryFeedback = .invalidCommand
+      },
+      sendProviderMessage: {
+        sendProviderMessage(value)
+      }
+    )
+  }
+
+  private func sendProviderMessage(_ value: String) {
     guard settings.aiDataConsent else {
       viewModel.showingConsent = true
       return
@@ -698,24 +719,25 @@ struct CoachView: View {
     }
   }
 
+  private func confirmPendingClear() {
+    guard let scope = clearConfirmation.consumeConfirmedScope() else {
+      return
+    }
+    confirmClear(scope)
+  }
+
   private func confirmClear(_ scope: ClearHistoryScope) {
-    pendingClearScope = nil
     let timestamp = Date()
     let calendar = Calendar.current
 
     do {
-      let legacyCompletionKeys = try legacyCompletionKeys(
-        for: scope,
-        at: timestamp,
-        calendar: calendar
-      )
-      try LocalCoachingHistoryResetService.reset(
+      try LocalCoachingHistoryResetCoordinator.reset(
         scope: scope,
         at: timestamp,
         calendar: calendar,
-        legacyCompletionKeys: legacyCompletionKeys,
         modelContext: modelContext,
-        settings: settings
+        settings: settings,
+        calendarStore: calendarService
       )
       viewModel.resetAfterHistoryClear()
       presentedMissedInsight = nil
@@ -726,29 +748,6 @@ struct CoachView: View {
     } catch {
       clearHistoryFeedback = .failure(scope)
     }
-  }
-
-  private func legacyCompletionKeys(
-    for scope: ClearHistoryScope,
-    at timestamp: Date,
-    calendar: Calendar
-  ) throws -> Set<String> {
-    guard let interval = scope.analysisInterval(
-      at: timestamp,
-      calendar: calendar
-    ) else {
-      return []
-    }
-    guard calendarService.accessState.canRead else {
-      throw AppError.calendarAccessRequired
-    }
-
-    try calendarService.refreshFromSystem()
-    let events = try calendarService.events(
-      from: interval.start,
-      to: interval.end
-    )
-    return Set(events.map(\.completionKey))
   }
 
   private func scroll(

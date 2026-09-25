@@ -90,8 +90,23 @@ final class CoachCommandTests: XCTestCase {
       "Clear last month's local coaching history?"
     )
     XCTAssertTrue(
-      ClearHistoryPresentation.confirmationMessage.contains(
-        "does not delete or change any Apple Calendar events"
+      ClearHistoryPresentation.confirmationMessage(for: .all).contains(
+        "coach messages, check-ins, Complete/Incomplete choices"
+      )
+    )
+    XCTAssertTrue(
+      ClearHistoryPresentation.confirmationMessage(for: .week).contains(
+        "clears every pending calendar draft"
+      )
+    )
+    XCTAssertTrue(
+      ClearHistoryPresentation.confirmationMessage(for: .month).contains(
+        "Previously sent AI data is not deleted"
+      )
+    )
+    XCTAssertTrue(
+      ClearHistoryPresentation.confirmationMessage(for: .all).contains(
+        "Apple Calendar events stay unchanged"
       )
     )
 
@@ -102,5 +117,33 @@ final class CoachCommandTests: XCTestCase {
       XCTAssertTrue(failure.contains("Nothing was deleted"))
       XCTAssertNotEqual(success, failure)
     }
+  }
+
+  func testLocalSubmissionDispatchNeverInvokesProviderPath() {
+    var confirmation = ClearHistoryConfirmationState()
+    var invalidCount = 0
+    var providerCount = 0
+
+    CoachSubmissionHandler.handle(
+      "/clear week",
+      requestLocalClear: { confirmation.request($0) },
+      rejectInvalidCommand: { invalidCount += 1 },
+      sendProviderMessage: { providerCount += 1 }
+    )
+
+    XCTAssertEqual(confirmation.pendingScope, .week)
+    XCTAssertEqual(invalidCount, 0)
+    XCTAssertEqual(providerCount, 0)
+  }
+
+  func testCancellingClearConfirmationIsANoOp() {
+    var confirmation = ClearHistoryConfirmationState()
+    confirmation.request(.month)
+
+    confirmation.cancel()
+
+    XCTAssertNil(confirmation.pendingScope)
+    XCTAssertFalse(confirmation.isPresented)
+    XCTAssertNil(confirmation.consumeConfirmedScope())
   }
 }

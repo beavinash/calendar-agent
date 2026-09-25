@@ -72,13 +72,76 @@ enum CoachSubmissionRouter {
   }
 }
 
-enum ClearHistoryPresentation {
-  static let confirmationMessage =
-    "This removes the selected local analysis history. "
-      + "It does not delete or change any Apple Calendar events."
+enum CoachSubmissionHandler {
+  static func handle(
+    _ message: String,
+    requestLocalClear: (ClearHistoryScope) -> Void,
+    rejectInvalidCommand: () -> Void,
+    sendProviderMessage: () -> Void
+  ) {
+    switch CoachSubmissionRouter.route(message) {
+    case let .confirmLocalClear(scope):
+      requestLocalClear(scope)
+    case .invalidLocalCommand:
+      rejectInvalidCommand()
+    case .providerMessage:
+      sendProviderMessage()
+    }
+  }
+}
 
+struct ClearHistoryConfirmationState: Equatable {
+  private(set) var pendingScope: ClearHistoryScope?
+
+  var isPresented: Bool {
+    pendingScope != nil
+  }
+
+  mutating func request(_ scope: ClearHistoryScope) {
+    pendingScope = scope
+  }
+
+  mutating func cancel() {
+    pendingScope = nil
+  }
+
+  mutating func consumeConfirmedScope() -> ClearHistoryScope? {
+    defer { pendingScope = nil }
+    return pendingScope
+  }
+}
+
+enum ClearHistoryPresentation {
   static let invalidCommandMessage =
     "Use /clear, /clear week, or /clear month."
+
+  static func confirmationMessage(for scope: ClearHistoryScope) -> String {
+    let preservation =
+      " Saved notes, calendar-write audits, reschedule safety links, app and notification "
+        + "settings, installation identity, credentials, and Apple Calendar events stay unchanged."
+        + " Previously sent AI data is not deleted."
+
+    switch scope {
+    case .all:
+      return
+        "This deletes all local Mark-1 coach messages, check-ins, Complete/Incomplete "
+        + "choices, every pending calendar draft, and earlier cleared-period exclusions. "
+        + "Analysis tracking restarts today."
+        + preservation
+    case .week:
+      return
+        "This deletes local Mark-1 coach messages, check-ins, and Complete/Incomplete choices "
+        + "from the previous completed week, clears every pending calendar draft, "
+        + "and excludes that week from future analysis."
+        + preservation
+    case .month:
+      return
+        "This deletes local Mark-1 coach messages, check-ins, and Complete/Incomplete choices "
+        + "from the previous completed month, clears every pending calendar draft, "
+        + "and excludes that month from future analysis."
+        + preservation
+    }
+  }
 
   static func confirmationTitle(for scope: ClearHistoryScope) -> String {
     switch scope {

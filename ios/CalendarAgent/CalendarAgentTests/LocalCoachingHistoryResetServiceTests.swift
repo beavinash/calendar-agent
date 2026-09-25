@@ -19,7 +19,153 @@ private final class ResetTestSecureStore: SecureStore {
 }
 
 @MainActor
+private final class ResetCalendarStoreSpy: CalendarStore {
+  var accessState: CalendarAccessState = .fullAccess
+  var calendars: [CalendarDescriptor] = []
+  var writableCalendars: [CalendarDescriptor] = []
+  var defaultWritableCalendar: CalendarDescriptor?
+  var todayEvents: [CalendarDisplayEvent] = []
+  var eventsToReturn: [CalendarDisplayEvent] = []
+  private(set) var refreshFromSystemCount = 0
+  private(set) var eventReadCount = 0
+  private(set) var applyCount = 0
+  private(set) var automaticApplyCount = 0
+  private(set) var undoCount = 0
+
+  func requestFullAccess() async throws {}
+  func refreshCalendars() {}
+
+  func refreshFromSystem() throws {
+    refreshFromSystemCount += 1
+  }
+
+  func refreshToday() throws {}
+
+  func events(
+    from start: Date,
+    to end: Date
+  ) throws -> [CalendarDisplayEvent] {
+    eventReadCount += 1
+    return eventsToReturn
+  }
+
+  func snapshot(
+    from start: Date,
+    to end: Date,
+    includeTitles: Bool,
+    includeFreeEvents: Bool
+  ) throws -> CalendarSnapshotResult {
+    CalendarSnapshotResult(events: [], isTruncated: false)
+  }
+
+  func apply(
+    proposal: CalendarProposal,
+    constraints: LocalScheduleConstraints,
+    validationMode: ScheduleValidationMode
+  ) throws -> AppliedCalendarEvent {
+    applyCount += 1
+    return AppliedCalendarEvent(
+      eventIdentifier: "unexpected-apply",
+      proposal: proposal
+    )
+  }
+
+  func applyAutomatically(
+    proposal: CalendarProposal,
+    authorizedCalendarIdentifier: String,
+    constraints: LocalScheduleConstraints,
+    validationMode: ScheduleValidationMode
+  ) throws -> AppliedCalendarEvent {
+    automaticApplyCount += 1
+    return AppliedCalendarEvent(
+      eventIdentifier: "unexpected-automatic-apply",
+      proposal: proposal
+    )
+  }
+
+  func undoAgentEvent(identifier: String) throws {
+    undoCount += 1
+  }
+
+  func agentEventExists(identifier: String) -> Bool {
+    false
+  }
+}
+
+@MainActor
 final class LocalCoachingHistoryResetServiceTests: XCTestCase {
+  func testScopedCoordinatorReadsCalendarButNeverMutatesIt() throws {
+    let context = try makeModelContext()
+    let calendar = try makeCalendar()
+    let now = try makeDate("2026-09-25T12:00:00-07:00")
+    let bounds = try XCTUnwrap(
+      ClearHistoryScope.week.analysisInterval(at: now, calendar: calendar)
+    )
+    let occurrence = bounds.start.addingTimeInterval(3_600)
+    let (settings, suite) = makeSettings(
+      startedAt: bounds.start.addingTimeInterval(-86_400)
+    )
+    defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+    let calendarStore = ResetCalendarStoreSpy()
+    calendarStore.eventsToReturn = [
+      CalendarDisplayEvent(
+        completionKey: "legacy-completion",
+        title: "Private title",
+        startAt: occurrence,
+        endAt: occurrence.addingTimeInterval(3_600),
+        isAllDay: false,
+        calendarTitle: "Private calendar"
+      )
+    ]
+    context.insert(
+      makeCompletion(key: "legacy-completion", occurrence: nil)
+    )
+    try context.save()
+
+    try LocalCoachingHistoryResetCoordinator.reset(
+      scope: .week,
+      at: now,
+      calendar: calendar,
+      modelContext: context,
+      settings: settings,
+      calendarStore: calendarStore
+    )
+
+    XCTAssertTrue(
+      try context.fetch(FetchDescriptor<CalendarEventCompletionRecord>()).isEmpty
+    )
+    XCTAssertEqual(calendarStore.refreshFromSystemCount, 1)
+    XCTAssertEqual(calendarStore.eventReadCount, 1)
+    XCTAssertEqual(calendarStore.applyCount, 0)
+    XCTAssertEqual(calendarStore.automaticApplyCount, 0)
+    XCTAssertEqual(calendarStore.undoCount, 0)
+  }
+
+  func testCancellingConfirmationPreservesPersistentState() throws {
+    let context = try makeModelContext()
+    let startedAt = try makeDate("2026-08-01T08:00:00-07:00")
+    let (settings, suite) = makeSettings(startedAt: startedAt)
+    defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+    let session = CoachSessionController(
+      defaults: UserDefaults(suiteName: suite)!
+    )
+    let sessionId = session.activeSessionId
+    context.insert(ChatMessageRecord(role: .user, content: "preserved"))
+    try context.save()
+    var confirmation = ClearHistoryConfirmationState()
+    confirmation.request(.all)
+
+    confirmation.cancel()
+
+    XCTAssertNil(confirmation.consumeConfirmedScope())
+    XCTAssertEqual(
+      try context.fetch(FetchDescriptor<ChatMessageRecord>()).map(\.content),
+      ["preserved"]
+    )
+    XCTAssertEqual(settings.trackingStartedAt, startedAt)
+    XCTAssertEqual(session.activeSessionId, sessionId)
+  }
+
   func testScopedResetDeletesOnlyTargetEvidenceAndPreservesSafetyData()
     throws {
     let context = try makeModelContext()
