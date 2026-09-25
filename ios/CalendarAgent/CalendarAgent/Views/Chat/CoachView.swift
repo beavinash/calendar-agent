@@ -736,6 +736,9 @@ struct CoachView: View {
         modelContext: modelContext,
         settings: settings
       )
+      viewModel.resetAfterHistoryClear()
+      presentedMissedInsight = nil
+      isFollowingGeneratedContent = false
       coachSession.startFreshSession()
       refreshMissedEventInsight()
     } catch {

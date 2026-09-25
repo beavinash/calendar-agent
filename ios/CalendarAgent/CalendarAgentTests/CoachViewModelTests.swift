@@ -1104,6 +1104,60 @@ final class CoachViewModelTests: XCTestCase {
     XCTAssertTrue(calendarStore.appliedProposals.isEmpty)
   }
 
+  func testHistoryClearResetRemovesGeneratedPresentationState()
+    async throws {
+    let client = FakeTurnClient { request in
+      if request.focusReviewRequested {
+        return makeReviewResponse(
+          for: request,
+          warnings: ["Stale review warning"]
+        )
+      }
+      return makePlanningResponse(proposalCount: 2)
+    }
+    let calendarStore = FakeCalendarStore()
+    let (settings, suite) = makeSettings(
+      trackingStartedAt: Date().addingTimeInterval(-90 * 86_400)
+    )
+    defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+    settings.aiDataConsent = true
+    let context = try makeModelContext()
+    let viewModel = CoachViewModel(clientFactory: { _ in client })
+
+    await viewModel.send(
+      message: "Plan tomorrow",
+      history: [],
+      notes: [],
+      modelContext: context,
+      settings: settings,
+      calendarService: calendarStore
+    )
+    await viewModel.send(
+      message: "/review week",
+      history: [],
+      notes: [],
+      modelContext: context,
+      settings: settings,
+      calendarService: calendarStore
+    )
+    viewModel.errorMessage = "Stale error"
+
+    XCTAssertEqual(viewModel.pendingProposals.count, 2)
+    XCTAssertNotNil(viewModel.focusReview)
+    XCTAssertEqual(viewModel.warnings, ["Stale review warning"])
+    XCTAssertNotNil(viewModel.presentedError)
+
+    viewModel.resetAfterHistoryClear()
+
+    XCTAssertTrue(viewModel.pendingProposals.isEmpty)
+    XCTAssertNil(viewModel.focusReview)
+    XCTAssertTrue(viewModel.warnings.isEmpty)
+    XCTAssertNil(viewModel.checkInQuestion)
+    XCTAssertNil(viewModel.calendarActionMessage)
+    XCTAssertNil(viewModel.presentedError)
+    XCTAssertFalse(viewModel.showingConsent)
+  }
+
   func testReviewRejectsTrueCompletionEvidenceMismatch() async throws {
     let client = FakeTurnClient { request in
       let valid = makeFocusReview(for: request)

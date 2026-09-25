@@ -650,6 +650,15 @@ final class CoachViewModel: ObservableObject {
     showingConsent = false
   }
 
+  func resetAfterHistoryClear() {
+    AppLogger.coach.info(
+      "Resetting generated coach state after local history clear"
+    )
+    pendingProposals = []
+    isApplyingSuggestions = false
+    resetVisibleSessionState()
+  }
+
   func saveAsNote(
     _ message: ChatMessageRecord,
     modelContext: ModelContext
