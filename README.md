@@ -60,6 +60,37 @@ The visible tabs are **Mark-1** and **Progress**. Internal source names still
 use `Coach*` and `CalendarAgent`; those are implementation names, not
 additional products.
 
+## Clear local coaching history
+
+Enter one of these commands in the Mark-1 chat composer. The app handles the
+command entirely on the iPhone and asks for confirmation before deleting
+anything:
+
+| Command | Local effect |
+| --- | --- |
+| `/clear` | Deletes all saved coach messages, check-ins, Complete/Incomplete choices, pending calendar drafts, and earlier cleared-period exclusions. It then starts a fresh coach session and restarts the analysis tracking date. |
+| `/clear week` | Deletes coach messages and check-ins dated inside the previous completed local calendar week, deletes matching completion evidence, clears every pending calendar draft, and excludes that week from future missed-event and AI-review evidence. |
+| `/clear month` | Applies the same scoped deletion to the previous completed local calendar month. |
+
+Week and month ranges are half-open calendar intervals in the iPhone's current
+time zone. A scoped clear freshly reads that Apple Calendar range so it can
+remove completion choices created by older app versions that did not retain an
+occurrence timestamp.
+
+These commands never delete, move, edit, or add an Apple Calendar event. The
+events remain visible in Mark-1 and Apple Calendar, but a cleared week or month
+is no longer treated as analysis evidence. Notes, calendar-write audit records,
+incomplete-event reschedule links, settings, notification preferences,
+installation identity, deployment credentials, and provider API keys are also
+preserved. Canceling the confirmation changes nothing.
+
+The commands delete Mark-1's local records only. They do not call a backend
+deletion endpoint and cannot retract context from an earlier AI request or
+erase provider/infrastructure retention. Previously transmitted data remains
+subject to the configured OpenAI or future Gemini project controls and the
+hosting provider's policies. Review those controls separately; disabling model
+training is not the same as zero retention.
+
 ## Apple Calendar setup
 
 No second Apple Account, dedicated calendar, CalDAV server, or invitation flow
