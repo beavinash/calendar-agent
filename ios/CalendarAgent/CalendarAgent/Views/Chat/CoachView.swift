@@ -47,6 +47,8 @@ struct CoachView: View {
   @Query(sort: \ChatMessageRecord.createdAt) private var messages: [ChatMessageRecord]
   @Query(sort: \CalendarEventCompletionRecord.updatedAt, order: .reverse)
   private var completions: [CalendarEventCompletionRecord]
+  @Query(sort: \ClearedAnalysisIntervalRecord.startAt)
+  private var clearedAnalysisIntervals: [ClearedAnalysisIntervalRecord]
   @StateObject private var viewModel = CoachViewModel()
   @State private var input = ""
   @State private var selectedReviewPeriod: FocusReviewPeriod = .day
@@ -55,6 +57,7 @@ struct CoachView: View {
   @State private var missedInsightLoadState: MissedEventInsightLoadState =
     .loading
   @State private var presentedMissedInsight: MissedEventInsightPresentation?
+  @State private var pendingClearScope: ClearHistoryScope?
   @FocusState private var inputFocused: Bool
 
   private var visibleMessages: [ChatMessageRecord] {
@@ -277,6 +280,29 @@ struct CoachView: View {
     }
     .sheet(item: $presentedMissedInsight) { presentation in
       MissedEventInsightDetailsView(insight: presentation.insight)
+    }
+    .confirmationDialog(
+      clearConfirmationTitle,
+      isPresented: Binding(
+        get: { pendingClearScope != nil },
+        set: { isPresented in
+          if !isPresented {
+            pendingClearScope = nil
+          }
+        }
+      ),
+      titleVisibility: .visible
+    ) {
+      if let scope = pendingClearScope {
+        Button(clearConfirmationButtonTitle(for: scope), role: .destructive) {
+          confirmClear(scope)
+        }
+      }
+      Button("Cancel", role: .cancel) {
+        pendingClearScope = nil
+      }
+    } message: {
+      Text(clearConfirmationMessage)
     }
     .alert(item: $viewModel.presentedError) { error in
       Alert(
@@ -517,7 +543,8 @@ struct CoachView: View {
       period: selectedReviewPeriod,
       now: now,
       trackingStartedAt: settings.trackingStartedAt,
-      calendar: .current
+      calendar: .current,
+      clearedIntervals: clearedAnalysisIntervals.map(\.interval)
     )
   }
 
@@ -622,6 +649,20 @@ struct CoachView: View {
   private func send() {
     let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !value.isEmpty else { return }
+    switch CoachSubmissionRouter.route(value) {
+    case let .confirmLocalClear(scope):
+      input = ""
+      inputFocused = false
+      pendingClearScope = scope
+      return
+    case .invalidLocalCommand:
+      inputFocused = false
+      viewModel.errorMessage =
+        "Use /clear, /clear week, or /clear month."
+      return
+    case .providerMessage:
+      break
+    }
     guard settings.aiDataConsent else {
       viewModel.showingConsent = true
       return
@@ -635,12 +676,96 @@ struct CoachView: View {
         history: visibleMessages,
         notes: [],
         completions: completions,
+        clearedIntervals: clearedAnalysisIntervals.map(\.interval),
         sessionId: coachSession.activeSessionId,
         modelContext: modelContext,
         settings: settings,
         calendarService: calendarService
       )
     }
+  }
+
+  private var clearConfirmationTitle: String {
+    guard let scope = pendingClearScope else {
+      return "Clear local coaching history?"
+    }
+    switch scope {
+    case .all:
+      return "Clear all local coaching history?"
+    case .week:
+      return "Clear last week's local coaching history?"
+    case .month:
+      return "Clear last month's local coaching history?"
+    }
+  }
+
+  private var clearConfirmationMessage: String {
+    "This removes the selected local analysis history. "
+      + "It does not delete or change any Apple Calendar events."
+  }
+
+  private func clearConfirmationButtonTitle(
+    for scope: ClearHistoryScope
+  ) -> String {
+    switch scope {
+    case .all:
+      "Clear All History"
+    case .week:
+      "Clear Last Week"
+    case .month:
+      "Clear Last Month"
+    }
+  }
+
+  private func confirmClear(_ scope: ClearHistoryScope) {
+    pendingClearScope = nil
+    let timestamp = Date()
+    let calendar = Calendar.current
+
+    do {
+      let legacyCompletionKeys = try legacyCompletionKeys(
+        for: scope,
+        at: timestamp,
+        calendar: calendar
+      )
+      try LocalCoachingHistoryResetService.reset(
+        scope: scope,
+        at: timestamp,
+        calendar: calendar,
+        legacyCompletionKeys: legacyCompletionKeys,
+        modelContext: modelContext,
+        settings: settings
+      )
+      coachSession.startFreshSession()
+      refreshMissedEventInsight()
+    } catch {
+      viewModel.errorMessage =
+        "Local coaching history could not be cleared. "
+          + error.localizedDescription
+    }
+  }
+
+  private func legacyCompletionKeys(
+    for scope: ClearHistoryScope,
+    at timestamp: Date,
+    calendar: Calendar
+  ) throws -> Set<String> {
+    guard let interval = scope.analysisInterval(
+      at: timestamp,
+      calendar: calendar
+    ) else {
+      return []
+    }
+    guard calendarService.accessState.canRead else {
+      throw AppError.calendarAccessRequired
+    }
+
+    try calendarService.refreshFromSystem()
+    let events = try calendarService.events(
+      from: interval.start,
+      to: interval.end
+    )
+    return Set(events.map(\.completionKey))
   }
 
   private func scroll(

@@ -52,3 +52,22 @@ enum CoachCommandParser {
     }
   }
 }
+
+enum CoachSubmissionRoute: Equatable {
+  case confirmLocalClear(ClearHistoryScope)
+  case invalidLocalCommand
+  case providerMessage
+}
+
+enum CoachSubmissionRouter {
+  static func route(_ message: String) -> CoachSubmissionRoute {
+    switch CoachCommandParser.parse(message) {
+    case let .command(.clear(scope)):
+      .confirmLocalClear(scope)
+    case .invalidClearSyntax:
+      .invalidLocalCommand
+    case .notACommand:
+      .providerMessage
+    }
+  }
+}

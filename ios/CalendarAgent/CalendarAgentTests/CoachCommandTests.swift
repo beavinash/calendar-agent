@@ -52,4 +52,27 @@ final class CoachCommandTests: XCTestCase {
       )
     }
   }
+
+  func testSubmissionRouterKeepsClearCommandsLocal() {
+    XCTAssertEqual(
+      CoachSubmissionRouter.route("/clear"),
+      .confirmLocalClear(.all)
+    )
+    XCTAssertEqual(
+      CoachSubmissionRouter.route("/clear week"),
+      .confirmLocalClear(.week)
+    )
+    XCTAssertEqual(
+      CoachSubmissionRouter.route("/clear month"),
+      .confirmLocalClear(.month)
+    )
+    XCTAssertEqual(
+      CoachSubmissionRouter.route("/clear day"),
+      .invalidLocalCommand
+    )
+    XCTAssertEqual(
+      CoachSubmissionRouter.route("Help me plan tomorrow"),
+      .providerMessage
+    )
+  }
 }
