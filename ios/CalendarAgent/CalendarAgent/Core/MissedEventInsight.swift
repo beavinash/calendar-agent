@@ -206,6 +206,7 @@ enum MissedEventInsightBuilder {
     now: Date,
     trackingStartedAt: Date,
     calendar: Calendar,
+    clearedIntervals: [DateInterval] = [],
     allDayEndHour: Int = 23
   ) -> MissedEventInsight {
     let bounds = MissedEventInsightQuery.analysisBounds(
@@ -232,6 +233,13 @@ enum MissedEventInsightBuilder {
               period: period,
               bounds: bounds,
               now: now,
+              calendar: calendar
+            ),
+            !AnalysisEvidencePolicy.isCleared(
+              startAt: event.startAt,
+              endAt: event.endAt,
+              isAllDay: event.isAllDay,
+              intervals: clearedIntervals,
               calendar: calendar
             ) else {
         continue
@@ -450,9 +458,12 @@ enum MissedEventInsightBuilder {
       }
       return event.startAt >= bounds.start && event.startAt <= now
     case .week, .month:
-      let assignmentDate = event.isAllDay
-        ? calendar.startOfDay(for: event.endAt.addingTimeInterval(-1))
-        : event.startAt
+      let assignmentDate = AnalysisEvidencePolicy.assignmentDate(
+        startAt: event.startAt,
+        endAt: event.endAt,
+        isAllDay: event.isAllDay,
+        calendar: calendar
+      )
       return assignmentDate >= bounds.start && assignmentDate < bounds.end
     }
   }

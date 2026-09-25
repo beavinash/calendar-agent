@@ -83,6 +83,41 @@ final class MissedEventInsightTests: XCTestCase {
     XCTAssertEqual(result.inferredUnmarkedCount, 0)
   }
 
+  func testClearedIntervalExcludesExplicitAndInferredMisses() {
+    let clearedExplicit = event(
+      "cleared-explicit",
+      title: "Cleared explicit",
+      hoursFromNow: -6 ... -5
+    )
+    let clearedUnmarked = event(
+      "cleared-unmarked",
+      title: "Cleared unmarked",
+      hoursFromNow: -4 ... -3
+    )
+    let retainedAtBoundary = event(
+      "retained",
+      title: "Retained",
+      hoursFromNow: -2 ... -1
+    )
+    let clearedInterval = DateInterval(
+      start: clearedExplicit.startAt,
+      end: retainedAtBoundary.startAt
+    )
+
+    let result = build(
+      [clearedExplicit, clearedUnmarked, retainedAtBoundary],
+      statuses: ["cleared-explicit": .incomplete],
+      clearedIntervals: [clearedInterval]
+    )
+
+    XCTAssertEqual(result.groups.map(\.displayTitle), ["Retained"])
+    XCTAssertEqual(result.evaluatedEventCount, 1)
+    XCTAssertEqual(result.coveredEvaluatedEventCount, 1)
+    XCTAssertEqual(result.missedEventCount, 1)
+    XCTAssertEqual(result.inferredUnmarkedCount, 1)
+    XCTAssertEqual(result.explicitIncompleteCount, 0)
+  }
+
   func testGroupsOnlyConservativeNormalizedTitleFamilies() {
     let events = [
       event("one", title: "Project planning", hoursFromNow: -8 ... -7),
@@ -629,7 +664,8 @@ final class MissedEventInsightTests: XCTestCase {
     statuses: [String: CalendarEventCompletionStatus] = [:],
     period: FocusReviewPeriod = .day,
     now: Date? = nil,
-    trackingStartedAt: Date? = nil
+    trackingStartedAt: Date? = nil,
+    clearedIntervals: [DateInterval] = []
   ) -> MissedEventInsight {
     MissedEventInsightBuilder.build(
       events: events,
@@ -637,7 +673,8 @@ final class MissedEventInsightTests: XCTestCase {
       period: period,
       now: now ?? self.now,
       trackingStartedAt: trackingStartedAt ?? self.trackingStartedAt,
-      calendar: calendar
+      calendar: calendar,
+      clearedIntervals: clearedIntervals
     )
   }
 
