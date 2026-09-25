@@ -151,6 +151,20 @@ final class LocalCoachingHistoryResetServiceTests: XCTestCase {
     )
     let sessionId = session.activeSessionId
     context.insert(ChatMessageRecord(role: .user, content: "preserved"))
+    context.insert(makeCheckIn(createdAt: startedAt))
+    context.insert(makeCompletion(key: "preserved", occurrence: startedAt))
+    context.insert(
+      PendingCalendarProposalRecord(proposal: makeProposal(at: startedAt))
+    )
+    context.insert(
+      ClearedAnalysisIntervalRecord(
+        scope: .week,
+        interval: DateInterval(
+          start: startedAt,
+          end: startedAt.addingTimeInterval(3_600)
+        )
+      )
+    )
     try context.save()
     var confirmation = ClearHistoryConfirmationState()
     confirmation.request(.all)
@@ -164,6 +178,19 @@ final class LocalCoachingHistoryResetServiceTests: XCTestCase {
     )
     XCTAssertEqual(settings.trackingStartedAt, startedAt)
     XCTAssertEqual(session.activeSessionId, sessionId)
+    XCTAssertEqual(try context.fetch(FetchDescriptor<CheckInRecord>()).count, 1)
+    XCTAssertEqual(
+      try context.fetch(FetchDescriptor<CalendarEventCompletionRecord>()).count,
+      1
+    )
+    XCTAssertEqual(
+      try context.fetch(FetchDescriptor<PendingCalendarProposalRecord>()).count,
+      1
+    )
+    XCTAssertEqual(
+      try context.fetch(FetchDescriptor<ClearedAnalysisIntervalRecord>()).count,
+      1
+    )
   }
 
   func testScopedResetDeletesOnlyTargetEvidenceAndPreservesSafetyData()

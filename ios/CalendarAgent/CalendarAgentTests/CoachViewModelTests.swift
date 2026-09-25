@@ -181,6 +181,35 @@ private final class FakeCalendarStore: CalendarStore {
 
 @MainActor
 final class CoachViewModelTests: XCTestCase {
+  func testClearCommandBypassesDisabledConsentPersistenceAndProviderClient()
+    throws {
+    let client = FakeTurnClient(error: AppError.network("unexpected provider call"))
+    let (settings, suite) = makeSettings()
+    defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+    let context = try makeModelContext()
+    let viewModel = CoachViewModel(clientFactory: { _ in client })
+    var pendingScope: ClearHistoryScope?
+
+    CoachSubmissionHandler.handle(
+      "/clear month",
+      requestLocalClear: { pendingScope = $0 },
+      rejectInvalidCommand: {
+        XCTFail("A supported clear command must not be rejected")
+      },
+      sendProviderMessage: {
+        XCTFail("A local clear command must not reach provider dispatch")
+      }
+    )
+
+    XCTAssertFalse(settings.aiDataConsent)
+    XCTAssertEqual(pendingScope, .month)
+    XCTAssertEqual(client.callCount, 0)
+    XCTAssertTrue(
+      try context.fetch(FetchDescriptor<ChatMessageRecord>()).isEmpty
+    )
+    XCTAssertFalse(viewModel.showingConsent)
+  }
+
   func testHostedClientExposesOnlyOpenAIProvider() {
     XCTAssertEqual(AIProvider.allCases, [.openai])
   }
