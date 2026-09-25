@@ -104,7 +104,8 @@ Review scope: iOS local state, related tests, README, and safety documentation
 
 - [x] T001 | P0 | depends: none | AC-001 | Add the three-command local parser; done when parser tests accept only `/clear`, `/clear week`, and `/clear month` after normalization.
   Evidence: focused parser tests passed 3/3 and related intent regressions passed 9/9 on the iOS 26.5 simulator; `git diff --check` is clean; no project Swift dependency-audit command exists.
-- [ ] T002 | P0 | depends: none | AC-003 | Add a persisted tracking-baseline restart operation; done when a new AppSettings instance restores the confirmed all-history reset timestamp.
+- [x] T002 | P0 | depends: none | AC-003 | Add a persisted tracking-baseline restart operation; done when a new AppSettings instance restores the confirmed all-history reset timestamp.
+  Evidence: the new restart test failed before implementation, then all 11 AppSettings tests passed on the iOS 26.5 simulator; `git diff --check` is clean; no project Swift dependency-audit command exists.
 - [ ] T003 | P0 | depends: none | AC-004, AC-006 | Add persisted cleared-analysis intervals; done when exact previous-week and previous-month bounds survive relaunch across time-zone-aware fixtures.
 - [ ] T004 | P0 | depends: none | AC-004 | Persist the calendar occurrence timestamp on new completion choices; done when completion-store tests retain the occurrence used for scoped deletion.
 - [ ] T005 | P0 | depends: T002, T003, T004 | AC-003, AC-004, AC-005 | Add the local coaching-history reset service; done when mixed-date SwiftData tests prove scoped deletion plus preservation without EventKit mutation.

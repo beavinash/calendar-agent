@@ -43,6 +43,29 @@ final class AppSettingsTests: XCTestCase {
     XCTAssertEqual(reloadedSettings.trackingStartedAt, firstStart)
   }
 
+  func testRestartTrackingUpdatesAndPersistsTheNewBaseline() {
+    let suite = "AppSettingsTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let firstStart = Date(timeIntervalSince1970: 1_750_000_000)
+    let resetAt = firstStart.addingTimeInterval(7 * 86_400)
+    let settings = AppSettings(
+      defaults: defaults,
+      secureStore: FakeSecureStore(),
+      now: { firstStart }
+    )
+
+    settings.restartTracking(at: resetAt)
+
+    let reloadedSettings = AppSettings(
+      defaults: defaults,
+      secureStore: FakeSecureStore(),
+      now: { resetAt.addingTimeInterval(86_400) }
+    )
+    XCTAssertEqual(settings.trackingStartedAt, resetAt)
+    XCTAssertEqual(reloadedSettings.trackingStartedAt, resetAt)
+  }
+
   func testHostedSettingsNeverReadLegacyProviderKeyAndPersistAppCredential()
     throws {
     let suite = "AppSettingsTests.\(UUID().uuidString)"

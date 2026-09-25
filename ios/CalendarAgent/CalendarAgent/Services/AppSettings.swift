@@ -78,7 +78,7 @@ final class AppSettings: ObservableObject {
   let morningEndMinutes = 8 * 60
   let eveningStartMinutes = 17 * 60 + 30
   let deviceID: UUID
-  let trackingStartedAt: Date
+  @Published private(set) var trackingStartedAt: Date
 
   init(
     defaults: UserDefaults = .standard,
@@ -181,6 +181,12 @@ final class AppSettings: ObservableObject {
       from: apiBaseURLString,
       allowInsecureLoopback: AppConfiguration.allowsInsecureLoopback
     )
+  }
+
+  func restartTracking(at timestamp: Date) {
+    trackingStartedAt = timestamp
+    defaults.set(timestamp, forKey: Key.trackingStartedAt)
+    AppLogger.persistence.info("Calendar tracking baseline restarted")
   }
 
   func saveAppSecret(_ value: String) throws {
