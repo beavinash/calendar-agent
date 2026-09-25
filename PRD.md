@@ -118,7 +118,7 @@ Review scope: iOS local state, related tests, README, and safety documentation
 - [x] T008 | P0 | depends: T003 | AC-006 | Exclude cleared periods from outbound review evidence; verified by captured requests containing only uncleared review events and missed-pattern groups.
 - [x] T009 | P0 | depends: T001, T005, T006 | AC-001, AC-002, AC-003, AC-004 | Integrate scoped confirmation into coach submission; verified by local-only routing, destructive confirmation with no-op cancel, fresh scoped EventKit reads, all three reset scopes, and fresh-session rotation across 14 focused tests.
 - [x] T010 | P1 | depends: T007, T008, T009 | AC-007 | Refresh reset-dependent coach presentation; verified by focused tests clearing in-memory drafts, review output, warnings, and errors while rotating the session and rebuilding deterministic insight.
-- [ ] T011 | P1 | depends: T009 | AC-007 | Surface accessible reset feedback; done when deterministic scoped success or failure copy is announced without a persistent chat row.
+- [x] T011 | P1 | depends: T009 | AC-007 | Surface accessible reset feedback; verified by scope-specific deterministic copy, system-alert announcement, local-only routing, and six focused presentation/state tests without a chat-record path.
 - [ ] T012 | P1 | depends: T010, T011 | AC-008 | Document local deletion boundaries; done when public documentation accurately distinguishes every command's deleted data from preserved data.
 
 ## 6. Open questions

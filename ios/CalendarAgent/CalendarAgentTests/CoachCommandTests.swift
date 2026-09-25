@@ -75,4 +75,32 @@ final class CoachCommandTests: XCTestCase {
       .providerMessage
     )
   }
+
+  func testClearHistoryPresentationCopyIsScopedAndHonest() {
+    XCTAssertEqual(
+      ClearHistoryPresentation.confirmationTitle(for: .all),
+      "Clear all local coaching history?"
+    )
+    XCTAssertEqual(
+      ClearHistoryPresentation.confirmationTitle(for: .week),
+      "Clear last week's local coaching history?"
+    )
+    XCTAssertEqual(
+      ClearHistoryPresentation.confirmationTitle(for: .month),
+      "Clear last month's local coaching history?"
+    )
+    XCTAssertTrue(
+      ClearHistoryPresentation.confirmationMessage.contains(
+        "does not delete or change any Apple Calendar events"
+      )
+    )
+
+    for scope in ClearHistoryScope.allCases {
+      let success = ClearHistoryPresentation.successMessage(for: scope)
+      let failure = ClearHistoryPresentation.failureMessage(for: scope)
+      XCTAssertTrue(success.contains("Apple Calendar events were not changed"))
+      XCTAssertTrue(failure.contains("Nothing was deleted"))
+      XCTAssertNotEqual(success, failure)
+    }
+  }
 }

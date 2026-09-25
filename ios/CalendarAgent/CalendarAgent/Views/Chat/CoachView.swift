@@ -58,6 +58,7 @@ struct CoachView: View {
     .loading
   @State private var presentedMissedInsight: MissedEventInsightPresentation?
   @State private var pendingClearScope: ClearHistoryScope?
+  @State private var clearHistoryFeedback: ClearHistoryFeedback?
   @FocusState private var inputFocused: Bool
 
   private var visibleMessages: [ChatMessageRecord] {
@@ -282,7 +283,9 @@ struct CoachView: View {
       MissedEventInsightDetailsView(insight: presentation.insight)
     }
     .confirmationDialog(
-      clearConfirmationTitle,
+      pendingClearScope.map(
+        ClearHistoryPresentation.confirmationTitle(for:)
+      ) ?? "Clear local coaching history?",
       isPresented: Binding(
         get: { pendingClearScope != nil },
         set: { isPresented in
@@ -294,7 +297,10 @@ struct CoachView: View {
       titleVisibility: .visible
     ) {
       if let scope = pendingClearScope {
-        Button(clearConfirmationButtonTitle(for: scope), role: .destructive) {
+        Button(
+          ClearHistoryPresentation.confirmationButtonTitle(for: scope),
+          role: .destructive
+        ) {
           confirmClear(scope)
         }
       }
@@ -302,7 +308,14 @@ struct CoachView: View {
         pendingClearScope = nil
       }
     } message: {
-      Text(clearConfirmationMessage)
+      Text(ClearHistoryPresentation.confirmationMessage)
+    }
+    .alert(item: $clearHistoryFeedback) { feedback in
+      Alert(
+        title: Text(feedback.title),
+        message: Text(feedback.message),
+        dismissButton: .default(Text("OK"))
+      )
     }
     .alert(item: $viewModel.presentedError) { error in
       Alert(
@@ -656,9 +669,9 @@ struct CoachView: View {
       pendingClearScope = scope
       return
     case .invalidLocalCommand:
+      input = ""
       inputFocused = false
-      viewModel.errorMessage =
-        "Use /clear, /clear week, or /clear month."
+      clearHistoryFeedback = .invalidCommand
       return
     case .providerMessage:
       break
@@ -682,38 +695,6 @@ struct CoachView: View {
         settings: settings,
         calendarService: calendarService
       )
-    }
-  }
-
-  private var clearConfirmationTitle: String {
-    guard let scope = pendingClearScope else {
-      return "Clear local coaching history?"
-    }
-    switch scope {
-    case .all:
-      return "Clear all local coaching history?"
-    case .week:
-      return "Clear last week's local coaching history?"
-    case .month:
-      return "Clear last month's local coaching history?"
-    }
-  }
-
-  private var clearConfirmationMessage: String {
-    "This removes the selected local analysis history. "
-      + "It does not delete or change any Apple Calendar events."
-  }
-
-  private func clearConfirmationButtonTitle(
-    for scope: ClearHistoryScope
-  ) -> String {
-    switch scope {
-    case .all:
-      "Clear All History"
-    case .week:
-      "Clear Last Week"
-    case .month:
-      "Clear Last Month"
     }
   }
 
@@ -741,10 +722,9 @@ struct CoachView: View {
       isFollowingGeneratedContent = false
       coachSession.startFreshSession()
       refreshMissedEventInsight()
+      clearHistoryFeedback = .success(scope)
     } catch {
-      viewModel.errorMessage =
-        "Local coaching history could not be cleared. "
-          + error.localizedDescription
+      clearHistoryFeedback = .failure(scope)
     }
   }
 

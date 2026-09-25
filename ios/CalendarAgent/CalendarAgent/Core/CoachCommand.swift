@@ -1,6 +1,6 @@
 import Foundation
 
-enum ClearHistoryScope: String, Hashable {
+enum ClearHistoryScope: String, CaseIterable, Hashable {
   case all
   case week
   case month
@@ -69,5 +69,95 @@ enum CoachSubmissionRouter {
     case .notACommand:
       .providerMessage
     }
+  }
+}
+
+enum ClearHistoryPresentation {
+  static let confirmationMessage =
+    "This removes the selected local analysis history. "
+      + "It does not delete or change any Apple Calendar events."
+
+  static let invalidCommandMessage =
+    "Use /clear, /clear week, or /clear month."
+
+  static func confirmationTitle(for scope: ClearHistoryScope) -> String {
+    switch scope {
+    case .all:
+      "Clear all local coaching history?"
+    case .week:
+      "Clear last week's local coaching history?"
+    case .month:
+      "Clear last month's local coaching history?"
+    }
+  }
+
+  static func confirmationButtonTitle(
+    for scope: ClearHistoryScope
+  ) -> String {
+    switch scope {
+    case .all:
+      "Clear All History"
+    case .week:
+      "Clear Last Week"
+    case .month:
+      "Clear Last Month"
+    }
+  }
+
+  static func successMessage(for scope: ClearHistoryScope) -> String {
+    let clearedDescription: String
+    switch scope {
+    case .all:
+      clearedDescription = "All local coaching history was cleared."
+    case .week:
+      clearedDescription = "Last week's local analysis history was cleared."
+    case .month:
+      clearedDescription = "Last month's local analysis history was cleared."
+    }
+    return clearedDescription
+      + " Apple Calendar events were not changed."
+  }
+
+  static func failureMessage(for scope: ClearHistoryScope) -> String {
+    let scopeDescription: String
+    switch scope {
+    case .all:
+      scopeDescription = "Local coaching history could not be cleared."
+    case .week:
+      scopeDescription = "Last week's local history could not be cleared."
+    case .month:
+      scopeDescription = "Last month's local history could not be cleared."
+    }
+    return scopeDescription + " Nothing was deleted. Please try again."
+  }
+}
+
+struct ClearHistoryFeedback: Identifiable, Equatable {
+  let id: UUID
+  let title: String
+  let message: String
+
+  static func success(_ scope: ClearHistoryScope) -> Self {
+    Self(
+      id: UUID(),
+      title: "History Cleared",
+      message: ClearHistoryPresentation.successMessage(for: scope)
+    )
+  }
+
+  static func failure(_ scope: ClearHistoryScope) -> Self {
+    Self(
+      id: UUID(),
+      title: "History Not Cleared",
+      message: ClearHistoryPresentation.failureMessage(for: scope)
+    )
+  }
+
+  static var invalidCommand: Self {
+    Self(
+      id: UUID(),
+      title: "Unknown Command",
+      message: ClearHistoryPresentation.invalidCommandMessage
+    )
   }
 }
