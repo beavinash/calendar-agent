@@ -1,9 +1,23 @@
 import Foundation
 
-enum ClearHistoryScope: String, Equatable {
+enum ClearHistoryScope: String, Hashable {
   case all
   case week
   case month
+
+  func analysisInterval(
+    at date: Date,
+    calendar: Calendar
+  ) -> DateInterval? {
+    switch self {
+    case .all:
+      nil
+    case .week:
+      FocusReviewPeriod.week.analysisBounds(at: date, calendar: calendar)
+    case .month:
+      FocusReviewPeriod.month.analysisBounds(at: date, calendar: calendar)
+    }
+  }
 }
 
 enum CoachCommand: Equatable {

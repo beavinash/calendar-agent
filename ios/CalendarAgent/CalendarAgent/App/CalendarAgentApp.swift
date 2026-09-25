@@ -45,7 +45,8 @@ struct CalendarAgentApp: App {
         CalendarAuditRecord.self,
         CalendarEventCompletionRecord.self,
         IncompleteEventRescheduleRecord.self,
-        PendingCalendarProposalRecord.self
+        PendingCalendarProposalRecord.self,
+        ClearedAnalysisIntervalRecord.self
       ]
     )
   }
