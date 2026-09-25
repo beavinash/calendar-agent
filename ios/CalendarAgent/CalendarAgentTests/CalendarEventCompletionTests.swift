@@ -91,6 +91,28 @@ final class CalendarEventCompletionTests: XCTestCase {
     XCTAssertEqual(Set(records.map(\.status)), [.complete, .incomplete])
   }
 
+  func testUpsertPersistsAndRefreshesTheEventOccurrenceTimestamp() throws {
+    let context = try makeModelContext()
+    let firstOccurrence = Date(timeIntervalSince1970: 1_700_100_000)
+    let correctedOccurrence = firstOccurrence.addingTimeInterval(900)
+
+    let created = try CalendarEventCompletionStore.upsert(
+      completionKey: "timestamped-event",
+      status: .incomplete,
+      eventOccurrenceAt: firstOccurrence,
+      modelContext: context
+    )
+    XCTAssertEqual(created.eventOccurrenceAt, firstOccurrence)
+
+    let updated = try CalendarEventCompletionStore.upsert(
+      completionKey: "timestamped-event",
+      status: .complete,
+      eventOccurrenceAt: correctedOccurrence,
+      modelContext: context
+    )
+    XCTAssertEqual(updated.eventOccurrenceAt, correctedOccurrence)
+  }
+
   private func makeModelContext() throws -> ModelContext {
     let schema = Schema([CalendarEventCompletionRecord.self])
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)

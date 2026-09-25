@@ -10,17 +10,20 @@ enum CalendarEventCompletionStatus: String, Codable, CaseIterable, Hashable {
 final class CalendarEventCompletionRecord {
   @Attribute(.unique) var completionKey: String
   var statusRaw: String
+  var eventOccurrenceAt: Date?
   var createdAt: Date
   var updatedAt: Date
 
   init(
     completionKey: String,
     status: CalendarEventCompletionStatus,
+    eventOccurrenceAt: Date? = nil,
     createdAt: Date = Date(),
     updatedAt: Date? = nil
   ) {
     self.completionKey = completionKey
     statusRaw = status.rawValue
+    self.eventOccurrenceAt = eventOccurrenceAt
     self.createdAt = createdAt
     self.updatedAt = updatedAt ?? createdAt
   }
@@ -44,6 +47,7 @@ enum CalendarEventCompletionStore {
   static func upsert(
     completionKey: String,
     status: CalendarEventCompletionStatus,
+    eventOccurrenceAt: Date? = nil,
     at timestamp: Date = Date(),
     modelContext: ModelContext
   ) throws -> CalendarEventCompletionRecord {
@@ -77,6 +81,9 @@ enum CalendarEventCompletionStore {
     let operation: String
     if let existing {
       existing.statusRaw = status.rawValue
+      if let eventOccurrenceAt {
+        existing.eventOccurrenceAt = eventOccurrenceAt
+      }
       existing.updatedAt = timestamp
       record = existing
       operation = "update"
@@ -84,6 +91,7 @@ enum CalendarEventCompletionStore {
       let created = CalendarEventCompletionRecord(
         completionKey: key,
         status: status,
+        eventOccurrenceAt: eventOccurrenceAt,
         createdAt: timestamp
       )
       modelContext.insert(created)

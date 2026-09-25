@@ -207,6 +207,7 @@ struct TodayDashboard: View {
       try CalendarEventCompletionStore.upsert(
         completionKey: event.completionKey,
         status: status,
+        eventOccurrenceAt: event.startAt,
         modelContext: modelContext
       )
       AppLogger.completion.info(
