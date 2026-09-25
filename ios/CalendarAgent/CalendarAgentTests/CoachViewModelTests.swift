@@ -545,6 +545,98 @@ final class CoachViewModelTests: XCTestCase {
     XCTAssertEqual(calendarStore.refreshFromSystemCount, 1)
   }
 
+  func testReviewExcludesClearedEventsFromAllOutboundEvidence()
+    async throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone.current
+    calendar.firstWeekday = Calendar.current.firstWeekday
+    let reviewNow = try XCTUnwrap(
+      calendar.date(
+        from: DateComponents(
+          year: 2026,
+          month: 8,
+          day: 6,
+          hour: 12
+        )
+      )
+    )
+    let reviewBounds = FocusReviewPeriod.week.analysisBounds(
+      at: reviewNow,
+      calendar: calendar
+    )
+    let clearedStart = reviewBounds.start.addingTimeInterval(9 * 3_600)
+    let retainedStart = reviewBounds.start.addingTimeInterval(33 * 3_600)
+    let clearedDisplayEvent = CalendarDisplayEvent(
+      completionKey: "cleared-event",
+      title: "Cleared task",
+      startAt: clearedStart,
+      endAt: clearedStart.addingTimeInterval(3_600),
+      isAllDay: false,
+      calendarTitle: "Private Calendar"
+    )
+    let retainedDisplayEvent = CalendarDisplayEvent(
+      completionKey: "retained-event",
+      title: "Retained task",
+      startAt: retainedStart,
+      endAt: retainedStart.addingTimeInterval(3_600),
+      isAllDay: false,
+      calendarTitle: "Private Calendar"
+    )
+    let snapshotEvents = [clearedDisplayEvent, retainedDisplayEvent].map {
+      event in
+      CalendarEventSnapshot(
+        eventId: event.completionKey,
+        calendarId: "private-calendar",
+        startAt: event.startAt,
+        endAt: event.endAt,
+        isAllDay: event.isAllDay,
+        title: event.title,
+        focusArea: nil,
+        completionStatus: nil
+      )
+    }
+    let clearedInterval = DateInterval(
+      start: reviewBounds.start,
+      end: retainedStart
+    )
+    let client = FakeTurnClient { request in
+      makeReviewResponse(for: request)
+    }
+    let calendarStore = FakeCalendarStore()
+    calendarStore.todayEvents = [clearedDisplayEvent, retainedDisplayEvent]
+    calendarStore.reviewSnapshotResult = CalendarSnapshotResult(
+      events: snapshotEvents,
+      isTruncated: false
+    )
+    let (settings, suite) = makeSettings(
+      trackingStartedAt: reviewNow.addingTimeInterval(-90 * 86_400)
+    )
+    defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+    settings.aiDataConsent = true
+    let viewModel = CoachViewModel(
+      clientFactory: { _ in client },
+      now: { reviewNow }
+    )
+
+    await viewModel.send(
+      message: "/review week",
+      history: [],
+      notes: [],
+      clearedIntervals: [clearedInterval],
+      modelContext: try makeModelContext(),
+      settings: settings,
+      calendarService: calendarStore
+    )
+
+    let request = try XCTUnwrap(client.lastRequest)
+    XCTAssertEqual(request.reviewCalendar.map(\.eventId), ["retained-event"])
+    XCTAssertEqual(
+      request.missedPatternContext?.groups.map(\.displayTitle),
+      ["Retained task"]
+    )
+    XCTAssertEqual(request.missedPatternContext?.missedEventCount, 1)
+  }
+
   func testPlanningOnlyKeepsMissedPatternTitlesOnDevice() async throws {
     let now = Date()
     let client = FakeTurnClient(response: makePlanningResponse(proposalCount: 0))

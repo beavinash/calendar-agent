@@ -115,7 +115,7 @@ Review scope: iOS local state, related tests, README, and safety documentation
 - [x] T006 | P1 | depends: none | AC-003 | Add an explicit fresh coach-session operation; done when tests prove immediate session rotation plus background-transition cleanup.
   Evidence: the new fresh-session test failed before implementation, then all 7 session lifecycle tests passed on the dedicated iOS 26.5 test simulator; persistence and background-transition cleanup are asserted; `git diff --check` is clean; no project Swift dependency-audit command exists.
 - [x] T007 | P0 | depends: T003 | AC-006 | Exclude cleared periods from local missed evidence; verified by 26 focused iOS tests covering explicit, inferred, half-open-boundary, and persisted-interval behavior.
-- [ ] T008 | P0 | depends: T003 | AC-006 | Exclude cleared periods from outbound review evidence; done when request capture contains no cleared event title or timing.
+- [x] T008 | P0 | depends: T003 | AC-006 | Exclude cleared periods from outbound review evidence; verified by captured requests containing only uncleared review events and missed-pattern groups.
 - [ ] T009 | P0 | depends: T001, T005, T006 | AC-001, AC-002, AC-003, AC-004 | Integrate scoped confirmation into coach submission; done when cancel is a no-op while each confirmed command invokes its matching local reset.
 - [ ] T010 | P1 | depends: T007, T008, T009 | AC-007 | Refresh reset-dependent coach presentation; done when stale generated state disappears after successful deletion.
 - [ ] T011 | P1 | depends: T009 | AC-007 | Surface accessible reset feedback; done when deterministic scoped success or failure copy is announced without a persistent chat row.

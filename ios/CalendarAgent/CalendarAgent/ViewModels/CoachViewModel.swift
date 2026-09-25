@@ -57,6 +57,7 @@ final class CoachViewModel: ObservableObject {
     history: [ChatMessageRecord],
     notes: [NoteRecord],
     completions: [CalendarEventCompletionRecord] = [],
+    clearedIntervals: [DateInterval] = [],
     sessionId: UUID? = nil,
     modelContext: ModelContext,
     settings: AppSettings,
@@ -224,7 +225,8 @@ final class CoachViewModel: ObservableObject {
             period: missedPeriod,
             now: now,
             trackingStartedAt: settings.trackingStartedAt,
-            calendar: calendar
+            calendar: calendar,
+            clearedIntervals: clearedIntervals
           )
           missedPatternContext = insight.contextPayload(
             window: analysisBounds
@@ -281,7 +283,15 @@ final class CoachViewModel: ObservableObject {
         )
       }
 
-      let reviewEvents = reviewSnapshot.events.map { event in
+      let reviewEvents = reviewSnapshot.events.filter { event in
+        !AnalysisEvidencePolicy.isCleared(
+          startAt: event.startAt,
+          endAt: event.endAt,
+          isAllDay: event.isAllDay,
+          intervals: clearedIntervals,
+          calendar: calendar
+        )
+      }.map { event in
         CalendarEventSnapshot(
           eventId: event.eventId,
           calendarId: event.calendarId,
