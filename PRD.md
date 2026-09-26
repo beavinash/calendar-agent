@@ -60,6 +60,10 @@ deleting or editing anything in Apple Calendar.
   SwiftData deletion succeeds. Scoped resets leave the original tracking baseline
   intact. Any deletion failure must leave reset metadata unchanged and show an
   error.
+- The all-history reset must replace prior cleared-period markers with one durable
+  half-open exclusion ending at the confirmed reset timestamp. This cutoff is the
+  authoritative fresh-start boundary after refresh or relaunch, even if an older
+  tracking baseline is restored temporarily.
 - Events whose scheduled occurrence predates the new tracking baseline remain
   visible in Apple Calendar and local calendar views, but are excluded from later
   missed-pattern evidence and AI review snapshots. Old titles or schedules must
@@ -90,6 +94,7 @@ deleting or editing anything in Apple Calendar.
 | AC-007 | Confirmation, success, and error states are accessible and clearly say Apple Calendar was not changed. | Copy assertions, accessibility identifiers, and manual simulator inspection. |
 | AC-008 | Public documentation describes the local deletion boundary and preserved data. | Marker search and documentation review. |
 | AC-009 | After a confirmed clear, the Coach screen cannot display stale pre-clear rows while refreshed evidence is loading; `/clear` excludes all earlier occurrences, `/clear week` leaves the previous completed week analysis empty, and `/clear month` leaves the previous completed month analysis empty. | State-policy regression tests for all three scopes plus focused Coach reset tests. |
+| AC-010 | Confirming `/clear` persists one all-history exclusion through the reset timestamp, removes every pre-reset occurrence from Today/Last Week/Last Month missed analysis after refresh or relaunch, then permits post-reset occurrences. | SwiftData reset-service regression plus deterministic boundary tests using a deliberately stale tracking baseline. |
 
 Validation commands:
 
@@ -105,6 +110,7 @@ Validation commands:
 
 Sprint: local-clear-fresh-start
 Review base: `d3537a8a12518f067f02efa5e939b42e32e74495`
+Corrective review base: `1cfb67b` (pre-fix fresh-start verification)
 Review scope: iOS local state, related tests, README, and safety documentation
 
 - [x] T001 | P0 | depends: none | AC-001 | Add the three-command local parser; done when parser tests accept only `/clear`, `/clear week`, and `/clear month` after normalization.
@@ -126,6 +132,7 @@ Review scope: iOS local state, related tests, README, and safety documentation
 - [x] T011 | P1 | depends: T009 | AC-007 | Surface accessible reset feedback; verified by scope-specific deterministic copy, system-alert announcement, local-only routing, and six focused presentation/state tests without a chat-record path.
 - [x] T012 | P1 | depends: T010, T011 | AC-008 | Document local deletion boundaries; verified by README coverage of every command, exact periods, deleted/preserved data, Apple Calendar non-mutation, cancellation, and provider-retention limits.
 - [x] T013 | P0 | depends: T010 | Clear cached missed-event presentation before post-reset refresh; verified by cache-state regressions for every reset scope, exact week/month exclusion tests, the 26-test insight suite, and the 166-test iOS suite.
+- [x] T014 | P0 | depends: T013 | Persist the all-history fresh-start exclusion; verified by a red-first reset regression, a half-open all-history boundary test, fresh-context SwiftData restoration, stale-baseline protection, and 57 related tests passing on the dedicated iOS 26.5 simulator.
 
 ## 6. Open questions
 

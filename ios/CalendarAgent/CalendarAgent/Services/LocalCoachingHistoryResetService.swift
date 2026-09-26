@@ -29,6 +29,16 @@ enum LocalCoachingHistoryResetService {
       switch scope {
       case .all:
         summary = try deleteAllAnalysisHistory(modelContext: modelContext)
+        modelContext.insert(
+          ClearedAnalysisIntervalRecord(
+            scope: .all,
+            interval: scope.missedAnalysisExclusionInterval(
+              at: timestamp,
+              calendar: calendar
+            ),
+            clearedAt: timestamp
+          )
+        )
       case .week, .month:
         guard let interval = scope.analysisInterval(
           at: timestamp,

@@ -30,11 +30,12 @@ struct CoachMissedInsightCache: Equatable {
     events = []
     loadState = .loading
 
-    guard let interval = scope.analysisInterval(
+    let interval = scope.missedAnalysisExclusionInterval(
       at: timestamp,
       calendar: calendar
-    ) else {
-      pendingClearedIntervals = []
+    )
+    if scope == .all {
+      pendingClearedIntervals = [interval]
       return
     }
     Self.appendIfMissing(interval, to: &pendingClearedIntervals)

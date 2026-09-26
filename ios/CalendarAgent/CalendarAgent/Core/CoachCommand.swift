@@ -18,6 +18,14 @@ enum ClearHistoryScope: String, CaseIterable, Hashable {
       FocusReviewPeriod.month.analysisBounds(at: date, calendar: calendar)
     }
   }
+
+  func missedAnalysisExclusionInterval(
+    at date: Date,
+    calendar: Calendar
+  ) -> DateInterval {
+    analysisInterval(at: date, calendar: calendar)
+      ?? DateInterval(start: .distantPast, end: date)
+  }
 }
 
 enum CoachCommand: Equatable {

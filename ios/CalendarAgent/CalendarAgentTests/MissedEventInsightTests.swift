@@ -141,7 +141,12 @@ final class MissedEventInsightTests: XCTestCase {
       XCTAssertEqual(cache.loadState, .loading)
       XCTAssertEqual(
         cache.effectiveClearedIntervals([]),
-        scope.analysisInterval(at: now, calendar: calendar).map { [$0] } ?? []
+        [
+          scope.missedAnalysisExclusionInterval(
+            at: now,
+            calendar: calendar
+          )
+        ]
       )
     }
   }

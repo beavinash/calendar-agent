@@ -38,6 +38,25 @@ final class ClearedAnalysisIntervalTests: XCTestCase {
     )
   }
 
+  func testAllClearHasADurableFreshStartExclusionEndingAtResetTime()
+    throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = try XCTUnwrap(
+      TimeZone(identifier: "America/Los_Angeles")
+    )
+    let resetAt = try XCTUnwrap(
+      ISO8601DateFormatter().date(from: "2026-09-25T15:40:00-07:00")
+    )
+
+    let interval = ClearHistoryScope.all.missedAnalysisExclusionInterval(
+      at: resetAt,
+      calendar: calendar
+    )
+
+    XCTAssertEqual(interval.start, .distantPast)
+    XCTAssertEqual(interval.end, resetAt)
+  }
+
   func testClearedIntervalsSurviveAFreshModelContext() throws {
     let schema = Schema([ClearedAnalysisIntervalRecord.self])
     let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -54,11 +73,18 @@ final class ClearedAnalysisIntervalTests: XCTestCase {
       start: Date(timeIntervalSince1970: 1_780_000_000),
       duration: 30 * 86_400
     )
+    let all = DateInterval(
+      start: .distantPast,
+      end: Date(timeIntervalSince1970: 1_800_000_000)
+    )
     firstContext.insert(
       ClearedAnalysisIntervalRecord(scope: .week, interval: week)
     )
     firstContext.insert(
       ClearedAnalysisIntervalRecord(scope: .month, interval: month)
+    )
+    firstContext.insert(
+      ClearedAnalysisIntervalRecord(scope: .all, interval: all)
     )
     try firstContext.save()
 
@@ -67,8 +93,8 @@ final class ClearedAnalysisIntervalTests: XCTestCase {
       FetchDescriptor<ClearedAnalysisIntervalRecord>()
     )
 
-    XCTAssertEqual(records.count, 2)
-    XCTAssertEqual(Set(records.map(\.scope)), [.week, .month])
-    XCTAssertEqual(Set(records.map(\.interval)), [week, month])
+    XCTAssertEqual(records.count, 3)
+    XCTAssertEqual(Set(records.map(\.scope)), [.all, .week, .month])
+    XCTAssertEqual(Set(records.map(\.interval)), [all, week, month])
   }
 }

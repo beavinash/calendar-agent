@@ -369,9 +369,13 @@ final class LocalCoachingHistoryResetServiceTests: XCTestCase {
     XCTAssertTrue(
       try context.fetch(FetchDescriptor<PendingCalendarProposalRecord>()).isEmpty
     )
-    XCTAssertTrue(
-      try context.fetch(FetchDescriptor<ClearedAnalysisIntervalRecord>()).isEmpty
+    let clearedIntervals = try context.fetch(
+      FetchDescriptor<ClearedAnalysisIntervalRecord>()
     )
+    XCTAssertEqual(clearedIntervals.count, 1)
+    XCTAssertEqual(clearedIntervals.first?.scope, .all)
+    XCTAssertEqual(clearedIntervals.first?.startAt, .distantPast)
+    XCTAssertEqual(clearedIntervals.first?.endAt, resetAt)
     XCTAssertEqual(settings.trackingStartedAt, resetAt)
     XCTAssertEqual(try context.fetch(FetchDescriptor<NoteRecord>()).count, 1)
     XCTAssertEqual(
@@ -382,6 +386,33 @@ final class LocalCoachingHistoryResetServiceTests: XCTestCase {
       try context.fetch(FetchDescriptor<IncompleteEventRescheduleRecord>()).count,
       1
     )
+
+    let beforeReset = CalendarDisplayEvent(
+      completionKey: "before-reset",
+      title: "Before reset",
+      startAt: resetAt.addingTimeInterval(-3_600),
+      endAt: resetAt.addingTimeInterval(-1_800),
+      isAllDay: false,
+      calendarTitle: "Personal"
+    )
+    let afterReset = CalendarDisplayEvent(
+      completionKey: "after-reset",
+      title: "After reset",
+      startAt: resetAt,
+      endAt: resetAt.addingTimeInterval(1_800),
+      isAllDay: false,
+      calendarTitle: "Personal"
+    )
+    let insight = MissedEventInsightBuilder.build(
+      events: [beforeReset, afterReset],
+      completionStatuses: [:],
+      period: .day,
+      now: resetAt.addingTimeInterval(3_600),
+      trackingStartedAt: startedAt,
+      calendar: calendar,
+      clearedIntervals: clearedIntervals.map(\.interval)
+    )
+    XCTAssertEqual(insight.groups.map(\.displayTitle), ["After reset"])
   }
 
   private func makeModelContext() throws -> ModelContext {

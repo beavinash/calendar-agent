@@ -68,7 +68,7 @@ anything:
 
 | Command | Local effect |
 | --- | --- |
-| `/clear` | Deletes all saved coach messages, check-ins, Complete/Incomplete choices, pending calendar drafts, and earlier cleared-period exclusions. It then starts a fresh coach session and restarts the analysis tracking date. |
+| `/clear` | Deletes all saved coach messages, check-ins, Complete/Incomplete choices, pending calendar drafts, and earlier cleared-period exclusions. It then starts a fresh coach session, restarts the analysis tracking date, and persists a new cutoff so pre-clear Apple Calendar events cannot reappear in missed-event analysis after refresh or relaunch. |
 | `/clear week` | Deletes coach messages and check-ins dated inside the previous completed local calendar week, deletes matching completion evidence, clears every pending calendar draft, and excludes that week from future missed-event and AI-review evidence. |
 | `/clear month` | Applies the same scoped deletion to the previous completed local calendar month. |
 
